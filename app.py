@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-from dah import Dash
+from dash import Dash
 from dash.dependencies import Input, Output
 from dash import dcc
 from dash import html
@@ -113,11 +113,7 @@ def update_graph(xaxis_column_name, yaxis_column_name,
     dff = df.query('Year == @year_value')
     dff = dff.query('@pop_limit[0] < Population <@pop_limit[1]')
     
-    fig = px.scatter(dff, x=xaxis_column_name,
-            y=yaxis_column_name,
-            hover_name='CityCountry',
-            color = 'continent', symbol='c40'
-            )
+    fig = px.scatter(dff, x=xaxis_column_name, y=yaxis_column_name, hover_name='CityCountry',color = 'continent', symbol='c40')
     j=0
     k=0
     for i, trace in enumerate(fig.data):

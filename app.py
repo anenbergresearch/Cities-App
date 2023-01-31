@@ -22,6 +22,7 @@ pd.options.plotting.backend = "plotly"
 
 
 app = Dash(__name__)#, external_stylesheets=external_stylesheets)
+server=app.server
 
 
 available_indicators = ['O3','PM','NO2']

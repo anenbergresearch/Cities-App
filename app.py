@@ -5,7 +5,11 @@ import plotly.graph_objects as go
 from dash import Dash
 from dash.dependencies import Input, Output
 from dash import dcc
+import dash_bootstrap_components as dbc
+
 from dash import html
+import plotly.io as pio
+
 df = pd.read_csv('updated_unified_data.csv')
 c40 = pd.read_excel('cityid-c40_crosswalk.xlsx')
 ID_pop = df[df['Year']==2019][['ID','Population']]
@@ -18,16 +22,36 @@ import dash.dependencies
 
 
 pd.options.plotting.backend = "plotly"
+external_stylesheets = [dbc.themes.BOOTSTRAP]
+
+pio.templates.default = "plotly_white"
 
 
-
-app = Dash(__name__)#, external_stylesheets=external_stylesheets)
-server=app.server
-
+app = Dash(__name__)
+server= app.server
 
 available_indicators = ['O3','PM','NO2']
+colors = {
+    'background': 'white',
+    'text': '#468570'
+}
 
 app.layout = html.Div([
+    
+    html.Div(style={'backgroundColor': colors['background']}, children=[
+        html.H1(
+            children='13,000 Cities',
+            style={
+                'textAlign': 'center',
+                'color': 'black'
+            }
+        ),
+
+        html.Div(children='Exploring general trends', style={
+            'textAlign': 'center',
+            'color': 'lightgray'
+        })]),
+    
     html.Div([
 
         html.Div([
@@ -43,7 +67,7 @@ app.layout = html.Div([
                 labelStyle={'display': 'inline-block'}
             )
         ],
-        style={'width': '49%', 'display': 'inline-block'}),
+        style={'width': '49%', 'display': 'inline-block','backgroundColor': colors['background']}),
         
         html.Div([
             dcc.Dropdown(
@@ -57,10 +81,10 @@ app.layout = html.Div([
                 value='Linear',
                 labelStyle={'display': 'inline-block'}
             )
-        ], style={'width': '49%', 'float': 'right', 'display': 'inline-block'})
+        ], style={'width': '49%', 'float': 'right', 'display': 'inline-block','backgroundColor': colors['background']})
     ], style={
-        'borderBottom': 'thin lightgrey solid',
-        'backgroundColor': 'rgb(250, 250, 250)',
+        'borderBottom': 'white',
+        'backgroundColor': 'white',
         'padding': '10px 5px'
     }),
     
@@ -70,7 +94,7 @@ app.layout = html.Div([
             id='crossfilter-indicator-scatter',
             hoverData={'points': [{'hovertext': 'Tokyo, Japan (13017)'}]}
         )
-    ], style={'width': '49%', 'display': 'inline-block', 'padding': '0 20'}),
+    ], style={'width': '49%', 'display': 'inline-block', 'padding': '0 20','borderBottom': colors['text'],}),
     html.Div([
         dcc.Graph(id='x-time-series'),
         dcc.Graph(id='y-time-series'),
@@ -82,8 +106,8 @@ app.layout = html.Div([
         max=df['Year'].max(),
         value=df['Year'].max(),
         marks={str(year): str(year) for year in df['Year'].unique()},
-        step=None
-    ), style={'width': '49%', 'padding': '0px 20px 20px 20px'}),
+        step=250000
+    ), style={'width': '95%', 'padding': '0px 20px 20px 20px','backgroundColor': colors['background'], 'color':colors['text']}),
     html.Div(dcc.RangeSlider(
         id='pop-limit--slider',
         min=df['Population'].min(),
@@ -93,7 +117,7 @@ app.layout = html.Div([
         marks=None,
         tooltip={"placement": "bottom","always_visible": True}
 
-    ), style={'width': '49%', 'padding': '0px 20px 20px 20px'}),
+    ), style={'width': '95%', 'padding': '0px 20px 20px 20px', 'backgroundColor': colors['background'], 'color':colors['text']}),
 ])
 
 @app.callback(
@@ -151,7 +175,7 @@ def update_graph(xaxis_column_name, yaxis_column_name,
 
 def create_time_series(dff, axis_type, title, axiscol_name):
 
-    fig = px.scatter(dff, x='Year', y=axiscol_name)
+    fig = px.scatter(dff, x='Year', y=axiscol_name, color_discrete_sequence = ['#4CB391'])
 
     fig.update_traces(mode='lines+markers')
 
@@ -161,7 +185,7 @@ def create_time_series(dff, axis_type, title, axiscol_name):
 
     fig.add_annotation(x=0, y=0.85, xanchor='left', yanchor='bottom',
                        xref='paper', yref='paper', showarrow=False, align='left',
-                       bgcolor='rgba(255, 255, 255, 0.5)', text=title)
+                       bgcolor='white', text=title)
 
     fig.update_layout(height=225, margin={'l': 20, 'b': 30, 'r': 10, 't': 10})
     return fig

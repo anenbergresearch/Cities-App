@@ -13,6 +13,25 @@ c40_p = c40.merge(ID_pop, how = 'left', left_on = 'city_id', right_on ='ID')
 total = c40_p[['ID','c40','continent']].merge(df, how = 'right', on ='ID')
 df = total[['ID','City','c40','Country','continent','Year','Population','NO2','PM','O3']].copy()
 df['CityCountry'] = df.City + ', ' + df.Country + ' (' +df.ID.apply(int).apply(str) +')'
+## Filter df
+ds= df.query('Year <2005')
+da = df.query('Year>=2005')
+##Find 0 values in 2000
+s =df.query('Year ==2000 & NO2==0')
+ds.loc[(ds['ID'].isin(s.ID)),('NO2')] =np.nan
+dfilt = pd.concat([ds,da])
+
+cont_l = df.continent.dropna().unique()
+colors = [["#58a862","#00e81d"],
+["#9466c9","#7905ff"],
+["#9b9c3b","#f0f216"],
+["#c75a8e","#f20c7a"],
+["#c98443","#ff7d03"],
+["#cb4f42","#ff260f"],
+["#6295cd","#6295cd"]]
+cont_dict = {}
+for i in range(len(cont_l)):
+    cont_dict[cont_l[i]]=colors[i]
 
 import dash.dependencies
 
@@ -37,9 +56,9 @@ app.layout = html.Div([
                 value='NO2'
             ),
             dcc.RadioItems(
-                id='crossfilter-yaxis-type',
-                options=[{'label': i, 'value': i} for i in ['Linear', 'Log']],
-                value='Linear',
+                id='crossfilter-data-type',
+                options=[{'label': i, 'value': i} for i in ['Filtered','Raw']],
+                value='Filtered',
                 labelStyle={'display': 'inline-block'}
             )
         ],
@@ -54,7 +73,7 @@ app.layout = html.Div([
             dcc.RadioItems(
                 id='crossfilter-xaxis-type',
                 options=[{'label': i, 'value': i} for i in ['Linear', 'Log']],                
-                value='Linear',
+                value='Log',
                 labelStyle={'display': 'inline-block'}
             )
         ], style={'width': '49%', 'float': 'right', 'display': 'inline-block'})
@@ -102,18 +121,20 @@ app.layout = html.Div([
     [dash.dependencies.Input('crossfilter-xaxis-column', 'value'),
      dash.dependencies.Input('crossfilter-yaxis-column', 'value'),
      dash.dependencies.Input('crossfilter-xaxis-type', 'value'),
-     dash.dependencies.Input('crossfilter-yaxis-type', 'value'),
+     dash.dependencies.Input('crossfilter-data-type', 'value'),
      dash.dependencies.Input('crossfilter-year--slider', 'value'),
      dash.dependencies.Input('pop-limit--slider', 'value'),
      ])
 
 
 def update_graph(xaxis_column_name, yaxis_column_name,
-                 xaxis_type, yaxis_type,
+                 xaxis_type, data_type,
                  year_value,pop_limit):
-    dff = df.query('Year == @year_value')
+    if data_type == 'Raw':
+        dff = df.query('Year == @year_value')
+    else:
+        dff =dfilt.query('Year == @year_value')
     dff = dff.query('@pop_limit[0] < Population <@pop_limit[1]')
-    
     fig = px.scatter(dff, x=xaxis_column_name, y=yaxis_column_name, hover_name='CityCountry',color = 'continent', symbol='c40')
     j=0
     k=0
@@ -121,6 +142,7 @@ def update_graph(xaxis_column_name, yaxis_column_name,
         name = trace.name.split(',')
         if name[1] == ' not_c40':
             trace['name'] = name[0]
+            trace['marker'] = {'color':cont_dict[name[0]][1],'opacity':0.2}
             trace['showlegend']=True
             trace['legendgroup']='Not C40'
             if j==0:
@@ -128,6 +150,8 @@ def update_graph(xaxis_column_name, yaxis_column_name,
                 j+=1
         else:
             trace['name'] = name[0]
+            trace['marker'] = {'color':cont_dict[name[0]][1], 'symbol':'star','size':10,'line':dict(width=0.8,
+                                        color='white')}
             trace['legendgroup']='C40'
             if k==0:
                 trace['legendgrouptitle_text']='C40 Cities'
@@ -142,7 +166,7 @@ def update_graph(xaxis_column_name, yaxis_column_name,
     
     fig.update_xaxes(title=xaxis_column_name, type='linear' if xaxis_type == 'Linear' else 'log')
 
-    fig.update_yaxes(title=yaxis_column_name, type='linear' if yaxis_type == 'Linear' else 'log')
+    #fig.update_yaxes(title=yaxis_column_name, type='linear' if yaxis_type == 'Linear' else 'log')
 
     fig.update_layout(margin={'l': 40, 'b': 40, 't': 10, 'r': 0}, hovermode='closest')
 
@@ -169,9 +193,13 @@ def create_time_series(dff, axis_type, title, axiscol_name):
     dash.dependencies.Output('x-time-series', 'figure'),
     [dash.dependencies.Input('crossfilter-indicator-scatter', 'hoverData'),
      dash.dependencies.Input('crossfilter-xaxis-column', 'value'),
+     dash.dependencies.Input('crossfilter-data-type', 'value'),
      dash.dependencies.Input('crossfilter-xaxis-type', 'value')])
-def update_y_timeseries(hoverData, xaxis_column_name, axis_type):
-    dff = df[df['CityCountry'] == hoverData['points'][0]['hovertext']]
+def update_y_timeseries(hoverData, xaxis_column_name, data_type,axis_type):
+    if data_type =='Raw':
+        dff = df[df['CityCountry'] == hoverData['points'][0]['hovertext']]
+    else:
+        dff = dfilt[dfilt['CityCountry'] == hoverData['points'][0]['hovertext']] 
     country_name = dff['CityCountry'].iloc[0]
     title = '<b>{}</b><br>{}'.format(country_name, xaxis_column_name)
     return create_time_series(dff, axis_type, title, xaxis_column_name)
@@ -181,11 +209,18 @@ def update_y_timeseries(hoverData, xaxis_column_name, axis_type):
     dash.dependencies.Output('y-time-series', 'figure'),
     [dash.dependencies.Input('crossfilter-indicator-scatter', 'hoverData'),
      dash.dependencies.Input('crossfilter-yaxis-column', 'value'),
-     dash.dependencies.Input('crossfilter-yaxis-type', 'value')])
-def update_x_timeseries(hoverData, yaxis_column_name, axis_type):
-    dff = df[df['CityCountry'] == hoverData['points'][0]['hovertext']]
+     dash.dependencies.Input('crossfilter-data-type', 'value')])
+def update_x_timeseries(hoverData, yaxis_column_name, data_type):
+    if data_type =='Raw':
+        dff = df[df['CityCountry'] == hoverData['points'][0]['hovertext']]
+    else:
+        dff = dfilt[dfilt['CityCountry'] == hoverData['points'][0]['hovertext']] 
     country_name = dff['CityCountry'].iloc[0]
-    return create_time_series(dff, axis_type, country_name,yaxis_column_name)
+    return create_time_series(dff, 'Linear', country_name,yaxis_column_name)
 
 if __name__== '__main__':
+<<<<<<< Updated upstream
     app.run_server(debug=True)
+=======
+    app.run_server(debug=False)
+>>>>>>> Stashed changes
